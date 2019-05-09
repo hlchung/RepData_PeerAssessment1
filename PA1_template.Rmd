@@ -1,25 +1,132 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Reproducible Research Course Project 1"
+author: "by HLChung"
+output: html_document
 ---
 
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
-## Loading and preprocessing the data
+##
+#### Collecting large amounts of data that shows personal movement via activity monitoring devices such as [Fitbit](http://www.fitbit.com/), [Nike Fuelband](http://www.nike.com/us/en_us/c/nikeplus-fuelband), or [Jawbone Up](https://jawbone.com/up) is now possible. In this project, we will be using data from an active activity monitoring device. The device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.
 
+## Loading the necessary packages and the dataset
+#### Loading of packages
+``` {r}
+library(ggplot2)
+library(RColorBrewer)
+```
+#### Downloading and loading the dataset
+``` {r}
+fileURL <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+file <- "repdata_2Fdata_Factivity.zip"
+if (!file.exists(file)){
+  download.file(fileURL,file,mode="wb")
+  }
+path <- "repdata_Factivity"
+if(!file.exists(path)){
+  unzip(file)
+}
 
+activity <- read.csv("activity.csv")
+activity$date <- as.Date(activity$date, format = "%Y-%m-%d")
+weekday <- weekdays(activity$date)
+activity <- cbind(activity, weekday)
+```
 
-## What is mean total number of steps taken per day?
+## Getting the mean/average total number of steps taken per day
+#### To get the mean total number of steps taken per day, we initially get the frequency of the total number of steps taken per day. 
+``` {r}
+totalstepsperday <- aggregate(activity$steps, list(activity$date), sum, na.rm=TRUE)
 
+names(totalstepsperday) <- paste(c("Date", "TotalSteps"))
 
+hist(totalstepsperday$TotalSteps, xlab = "Number of Steps", ylab = "Frequency", main = "Frequency of Total Number of Steps per Day ", col=brewer.pal(n=8, name="Spectral"))
+```
 
-## What is the average daily activity pattern?
+#### The code below shows how we will be able to get the **average total number of steps taken per day** as well as the **median of the number of steps taken per day**. It is also noted that only non-zero records are included the computation. 
 
+#### _Getting the mean/average_
+```{r}
+mean(totalstepsperday$TotalSteps[totalstepsperday$TotalSteps!=0], na.rm = TRUE)
+```
 
+#### From the generated output above, we determine that **the average total number of steps taken per day is 10766.19**
+
+#### _Getting the median_
+```{r}
+median(totalstepsperday$TotalSteps[totalstepsperday$TotalSteps!=0], na.rm = TRUE)
+```
+
+#### From the generated output above, we determine that **the median of the total number of steps taken per day is 10765**
+
+## Getting the average daily activity pattern
+#### The code below generates a time-series plot at 5-minute intervals and the average number of steps taken across all days.
+```{r}
+activityinterval <- aggregate(activity$steps, list(activity$interval), mean, na.rm = TRUE)
+names(activityinterval) <- paste(c("Time", "AverageSteps"))
+
+plot(activityinterval$Time, activityinterval$AverageSteps, type = 'l', xlab = "Time Interval", ylab = "Average Steps", main = "Average Daily Activity Pattern (at 5-minute intervals)")
+```
+
+#### The code below shows how we can determine which interval, on average, records the maximum number of steps.
+```{r}
+activityinterval[which(activityinterval$AverageSteps==max(activityinterval$AverageSteps)), ]
+```
 
 ## Imputing missing values
+#### _Calculating the number of NAs in the dataset_
+```{r}
+sum(is.na(activity))
+```
 
+#### _Replacing NAs with the mean of total number of steps_
+```{r}
+activityreplaceNA <- activity
+for (i in 1:nrow(activityreplaceNA)){
+       ifelse(is.na(activityreplaceNA$steps[i])==TRUE,
+              activityreplaceNA$steps[i] <- activityinterval$AverageSteps[activityinterval$Time==activityreplaceNA$interval[i]],
+              activityreplaceNA$steps[i] <- activity$steps[i])
+    }
+```
 
+#### _Graphing the total number of steps taken each day after imputing the missing values_
+```{r}
+newtotalstepsperday <- aggregate(activityreplaceNA$steps, list(activityreplaceNA$date), sum, na.rm=TRUE)
 
-## Are there differences in activity patterns between weekdays and weekends?
+names(newtotalstepsperday) <- paste(c("Date", "TotalSteps"))
+
+hist(newtotalstepsperday$TotalSteps, xlab = "Number of Steps", ylab = "Frequency", main = "Frequency of Total Number of Steps per Day ", col=brewer.pal(n=8, name="Spectral"))
+```
+
+#### The code below shows how we will be able to get the **average total number of steps taken per day** as well as the **median of the number of steps taken per day** after imputing the missing values. 
+#### _Getting the mean/average_
+```{r}
+mean(newtotalstepsperday$TotalSteps[newtotalstepsperday$TotalSteps!=0], na.rm = TRUE)
+```
+#### From the generated output above, we determine that **the average total number of steps taken per day is 10766.19**
+#### _Getting the median_
+```{r}
+median(newtotalstepsperday$TotalSteps[newtotalstepsperday$TotalSteps!=0], na.rm = TRUE)
+```
+#### From the generated output above, we determine that **the median of the total number of steps taken per day is 10766.19**
+
+#### Comparing both the mean and median of the new dataset and the original dataset, the mean remains the same while the median increased slightly. Imputing the mean doesn't really skew the data.
+
+## Finding out if there are differences in activity patterns between weekdays and weekends
+####Creating a new factor variable for weekdays and weekend
+```{r}
+activityreplaceNA$TypeofDay <- ifelse(weekdays(as.Date(activityreplaceNA$date))=="Saturday"|weekdays(as.Date(activityreplaceNA$date))=="Sunday","Weekend","Weekday")
+```
+#### Creating a time series plot for weekdays and weekends
+```{r}
+par(mfrow = c(1,2))
+activityintervaltimeofday <- aggregate(activityreplaceNA$steps, list(activityreplaceNA$interval, activityreplaceNA$TypeofDay), mean)
+names(activityintervaltimeofday) <- paste(c("TimeInterval", "Week", "AverageTime")) 
+activityweekday <- activityintervaltimeofday[which(activityintervaltimeofday$Week == "Weekday"), ]
+activityweekend <- activityintervaltimeofday[which(activityintervaltimeofday$Week == "Weekend"), ]
+
+plot(x = activityweekday$TimeInterval, y = activityweekday$AverageTime, type='l', main="Average Daily Steps (Weekday)",xlab="Interval",ylab="Steps")
+plot(x = activityweekend$TimeInterval, y = activityweekend$AverageTime, type='l', main="Average Daily Steps (Weekend)",xlab="Interval",ylab="Steps")
+```
